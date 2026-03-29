@@ -4,19 +4,16 @@ use IEEE.NUMERIC_STD.ALL;
 
 entity UART_RX is
     Port ( 
-        clk         : in  STD_LOGIC;  -- 50MHz Clock
+        clk         : in  STD_LOGIC;
         rst         : in  STD_LOGIC;
-        rx_in       : in  STD_LOGIC;  -- สายรับข้อมูลจาก ESP32 (TX)
-        
-        rx_data     : out STD_LOGIC_VECTOR (7 downto 0); -- ข้อมูล 8-bit ที่รับได้
-        data_ready  : out STD_LOGIC   -- สัญญาณบอกว่า "รับข้อมูลเสร็จแล้ว 1 ตัวอักษร"
+        rx_in       : in  STD_LOGIC;
+        rx_data     : out STD_LOGIC_VECTOR (7 downto 0);
+        data_ready  : out STD_LOGIC
     );
 end UART_RX;
 
 architecture Behavioral of UART_RX is
 
-    -- คำนวณ Clock ต่อ 1 Bit (Baud Rate 9600 bps ที่ Clock 50MHz)
-    -- 50,000,000 / 9600 = 5208
     constant CLKS_PER_BIT : integer := 5208;
     
     type state_type is (IDLE, START_BIT, DATA_BITS, STOP_BIT);
@@ -26,8 +23,7 @@ architecture Behavioral of UART_RX is
     signal bit_index : integer range 0 to 7 := 0;
     signal rx_buffer : STD_LOGIC_VECTOR(7 downto 0) := (others => '0');
 
-    -- [แก้ไข] เพิ่ม 2-stage synchronizer กัน Metastability
-    -- rx_in (ภายนอก) → rx_meta → rx_sync → ใช้งานภายใน
+    -- 2-stage synchronizer กัน Metastability
     signal rx_meta   : STD_LOGIC := '1';
     signal rx_sync   : STD_LOGIC := '1';
 
@@ -47,45 +43,37 @@ begin
             
         elsif rising_edge(clk) then
 
-            -- [แก้ไข] 2-Stage Synchronizer: ทำก่อนทุกอย่างในทุก clock cycle
+            -- 2-Stage Synchronizer (ทำก่อนทุกอย่าง)
             rx_meta <= rx_in;
             rx_sync <= rx_meta;
 
-            -- ค่าเริ่มต้นของแต่ละจังหวะ Clock ให้ data_ready เป็น 0 ไว้ก่อน
-            -- จะเป็น 1 แค่จังหวะเดียวตอนรับครบ 1 Byte
+            -- data_ready เป็น '1' แค่ 1 clock cycle
             data_ready <= '0';
             
             case state is
                 
-                -- รอสัญญาณ Start Bit (สาย UART ปกติจะอยู่ที่ '1' เสมอ)
                 when IDLE =>
                     clk_count <= 0;
                     bit_index <= 0;
-                    -- [แก้ไข] ใช้ rx_sync แทน rx_in โดยตรง
-                    -- รอจนกว่าสายจะโดนดึงลงเป็น 0 (สัญญาณ Start Bit)
                     if rx_sync = '0' then
                         state <= START_BIT;
-                    end if;  -- [แก้ไข] end if ที่ถูกต้อง (เดิมเป็น end case ผิด)
+                    end if;
                     
-                -- รอให้ผ่านไปครึ่งบิต แล้วอ่านตรงกลางสัญญาณ
                 when START_BIT =>
                     if clk_count = (CLKS_PER_BIT / 2) then
-                        -- [แก้ไข] ใช้ rx_sync แทน rx_in
-                        if rx_sync = '0' then  -- เช็คชัวร์ว่ายังเป็น Start Bit จริง
+                        if rx_sync = '0' then
                             clk_count <= 0;
                             state     <= DATA_BITS;
                         else
-                            state <= IDLE;  -- สัญญาณหลอก (Glitch) กลับไปรอใหม่
+                            state <= IDLE;  -- Glitch กลับไปรอใหม่
                         end if;
                     else
                         clk_count <= clk_count + 1;
                     end if;
                     
-                -- รับข้อมูลทีละ 1 บิต รวม 8 บิต
                 when DATA_BITS =>
                     if clk_count = CLKS_PER_BIT - 1 then
-                        clk_count <= 0;
-                        -- [แก้ไข] ใช้ rx_sync แทน rx_in
+                        clk_count            <= 0;
                         rx_buffer(bit_index) <= rx_sync;
                         
                         if bit_index < 7 then
@@ -98,16 +86,14 @@ begin
                         clk_count <= clk_count + 1;
                     end if;
                     
-                -- รอรับ Stop Bit และตรวจสอบว่าถูกต้อง
                 when STOP_BIT =>
                     if clk_count = CLKS_PER_BIT - 1 then
-                        -- [แก้ไข] เช็ค Stop Bit ต้องเป็น '1' เท่านั้น
-                        -- ถ้าเป็น '0' = Framing Error ทิ้งข้อมูล
-                        if rx_sync = '1' then
-                            rx_data    <= rx_buffer;  -- ส่งข้อมูลออก
-                            data_ready <= '1';        -- แจ้งระบบว่ามีข้อมูลพร้อม (1 cycle เท่านั้น)
+                        if rx_sync = '1' then  -- Stop Bit ถูกต้อง
+                            rx_data    <= rx_buffer;
+                            data_ready <= '1';
                         end if;
-                        state <= IDLE;  -- กลับไปรอรับตัวอักษรถัดไปเสมอ
+                        -- ถ้า Stop Bit = '0' = Framing Error ทิ้งข้อมูล
+                        state <= IDLE;
                     else
                         clk_count <= clk_count + 1;
                     end if;
