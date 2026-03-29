@@ -1,0 +1,97 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
+
+entity UART_TX is
+    Port ( 
+        clk       : in  STD_LOGIC;
+        rst       : in  STD_LOGIC;
+        tx_data   : in  STD_LOGIC_VECTOR (7 downto 0);
+        tx_start  : in  STD_LOGIC;
+        tx_out    : out STD_LOGIC;
+        tx_busy   : out STD_LOGIC
+    );
+end UART_TX;
+
+architecture Behavioral of UART_TX is
+
+    constant CLKS_PER_BIT : integer := 5208;
+
+    type state_type is (IDLE, START_BIT, DATA_BITS, STOP_BIT);
+    signal state : state_type := IDLE;
+
+    signal clk_count : integer range 0 to CLKS_PER_BIT-1 := 0;
+    signal bit_index : integer range 0 to 7 := 0;
+    signal tx_buffer : STD_LOGIC_VECTOR(7 downto 0) := (others => '0');
+    signal tx_busy_i : STD_LOGIC := '0';  -- internal busy signal
+
+begin
+
+    tx_busy <= tx_busy_i;
+
+    process(clk, rst)
+    begin
+        if rst = '1' then
+            state     <= IDLE;
+            tx_out    <= '1';
+            tx_busy_i <= '0';
+            clk_count <= 0;
+            bit_index <= 0;
+            tx_buffer <= (others => '0');
+
+        elsif rising_edge(clk) then
+            case state is
+
+                when IDLE =>
+                    tx_out    <= '1';
+                    tx_busy_i <= '0';
+                    clk_count <= 0;
+                    bit_index <= 0;
+
+                    if tx_start = '1' and tx_busy_i = '0' then
+                        tx_buffer <= tx_data;
+                        tx_busy_i <= '1';
+                        state     <= START_BIT;
+                    end if;
+
+                when START_BIT =>
+                    tx_out <= '0';
+
+                    if clk_count = CLKS_PER_BIT - 1 then
+                        clk_count <= 0;
+                        state     <= DATA_BITS;
+                    else
+                        clk_count <= clk_count + 1;
+                    end if;
+
+                when DATA_BITS =>
+                    tx_out <= tx_buffer(bit_index);
+
+                    if clk_count = CLKS_PER_BIT - 1 then
+                        clk_count <= 0;
+                        if bit_index < 7 then
+                            bit_index <= bit_index + 1;
+                        else
+                            bit_index <= 0;
+                            state     <= STOP_BIT;
+                        end if;
+                    else
+                        clk_count <= clk_count + 1;
+                    end if;
+
+                when STOP_BIT =>
+                    tx_out <= '1';
+
+                    if clk_count = CLKS_PER_BIT - 1 then
+                        tx_busy_i <= '0';
+                        state     <= IDLE;
+                        clk_count <= 0;
+                    else
+                        clk_count <= clk_count + 1;
+                    end if;
+
+            end case;
+        end if;
+    end process;
+
+end Behavioral;
