@@ -2,70 +2,270 @@ library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 
-entity Floor_Position_Tracker is
+entity Elevator_Top is
     Port ( 
-        clk         : in  STD_LOGIC;  -- สัญญาณนาฬิกาหลักของบอร์ด
-        rst         : in  STD_LOGIC;  -- ปุ่ม Reset (Active High)
-        pulse_in    : in  STD_LOGIC;  -- สัญญาณพัลส์ที่ได้จากการหมุนของมอเตอร์/Encoder
-        dir_up      : in  STD_LOGIC;  -- ทิศทางมอเตอร์: '1' = ลิฟต์กำลังขึ้น, '0' = ลิฟต์กำลังลง
+        -- สัญญาณพื้นฐาน
+        clk          : in  STD_LOGIC;
+        rst          : in  STD_LOGIC;
         
-        current_pos : out STD_LOGIC_VECTOR (15 downto 0) -- ค่าตำแหน่งที่นับได้ (0 ถึง 65535)
+        -- Input จาก Hardware
+        pulse_in     : in  STD_LOGIC;  -- Encoder มอเตอร์
+        rx_in        : in  STD_LOGIC;  -- UART RX จาก ESP32
+        door_hold    : in  STD_LOGIC;  -- ปุ่ม Hold ประตู
+        
+        -- สวิตเลือกชั้นออฟไลน์ (Priority สูงกว่า UART)
+        sw_floor1    : in  STD_LOGIC;  -- ปุ่มชั้น 1
+        sw_floor2    : in  STD_LOGIC;  -- ปุ่มชั้น 2
+        sw_floor3    : in  STD_LOGIC;  -- ปุ่มชั้น 3
+        
+        -- Output มอเตอร์ (L298N)
+        ena_pwm      : out STD_LOGIC;
+        in1_dir      : out STD_LOGIC;
+        in2_dir      : out STD_LOGIC;
+        
+        -- Output สถานะ
+        door_led     : out STD_LOGIC;                    -- LED ประตู
+        seg_out      : out STD_LOGIC_VECTOR(6 downto 0); -- 7-Segment แสดงชั้น
+        tx_out       : out STD_LOGIC                     -- UART TX ส่งสถานะกลับ ESP32
     );
-end Floor_Position_Tracker;
+end Elevator_Top;
 
-architecture Behavioral of Floor_Position_Tracker is
+architecture Structural of Elevator_Top is
 
-    -- [แก้ไข] แยก Synchronizer ออกจาก Edge Detector ให้ชัดเจน
-    -- ชั้นที่ 1: รับสัญญาณภายนอก กัน Metastability
-    signal pulse_meta  : STD_LOGIC := '0';
-    -- ชั้นที่ 2-3: Stabilize + Edge Detection
-    -- pulse_sync(0) = ค่าปัจจุบัน (หลัง stabilize)
-    -- pulse_sync(1) = ค่าก่อนหน้า (ไว้เปรียบเทียบหา rising edge)
-    signal pulse_sync  : STD_LOGIC_VECTOR(1 downto 0) := "00";
+    -- ==========================================
+    -- Component Declarations
+    -- ==========================================
 
-    -- ตัวแปรเก็บค่าตำแหน่งปัจจุบัน (เริ่มต้นที่ 0 = ชั้น 1)
-    signal pos_counter : integer range 0 to 65535 := 0;
+    component UART_RX
+        Port ( clk        : in  STD_LOGIC;
+               rst        : in  STD_LOGIC;
+               rx_in      : in  STD_LOGIC;
+               rx_data    : out STD_LOGIC_VECTOR (7 downto 0);
+               data_ready : out STD_LOGIC);
+    end component;
+
+    component UART_TX
+        Port ( clk      : in  STD_LOGIC;
+               rst      : in  STD_LOGIC;
+               tx_data  : in  STD_LOGIC_VECTOR (7 downto 0);
+               tx_start : in  STD_LOGIC;
+               tx_out   : out STD_LOGIC;
+               tx_busy  : out STD_LOGIC);
+    end component;
+
+    component Floor_Position_Tracker
+        Port ( clk         : in  STD_LOGIC;
+               rst         : in  STD_LOGIC;
+               pulse_in    : in  STD_LOGIC;
+               dir_up      : in  STD_LOGIC;
+               current_pos : out STD_LOGIC_VECTOR (15 downto 0));
+    end component;
+
+    component Elevator_FSM
+        Port ( clk          : in  STD_LOGIC;
+               rst          : in  STD_LOGIC;
+               target_floor : in  STD_LOGIC_VECTOR (1 downto 0);
+               current_pos  : in  STD_LOGIC_VECTOR (15 downto 0);
+               door_hold    : in  STD_LOGIC;
+               motor_run    : out STD_LOGIC;
+               motor_dir    : out STD_LOGIC;
+               door_led     : out STD_LOGIC);
+    end component;
+
+    -- ==========================================
+    -- Internal Signals
+    -- ==========================================
+
+    -- UART RX
+    signal sig_rx_data      : STD_LOGIC_VECTOR(7 downto 0);
+    signal sig_rx_ready     : STD_LOGIC;
+
+    -- UART TX
+    signal sig_tx_data      : STD_LOGIC_VECTOR(7 downto 0);
+    signal sig_tx_start     : STD_LOGIC := '0';
+    signal sig_tx_busy      : STD_LOGIC;
+
+    -- คำสั่งชั้นเป้าหมาย (เริ่มต้นชั้น 1)
+    signal reg_target_floor : STD_LOGIC_VECTOR(1 downto 0) := "01";
+
+    -- ตำแหน่งและมอเตอร์
+    signal sig_current_pos  : STD_LOGIC_VECTOR(15 downto 0);
+    signal sig_motor_run    : STD_LOGIC;
+    signal sig_motor_dir    : STD_LOGIC;
+
+    -- ชั้นปัจจุบัน (สำหรับ 7-segment และ UART TX)
+    signal sig_current_floor     : STD_LOGIC_VECTOR(1 downto 0) := "01";
+    signal sig_last_floor        : STD_LOGIC_VECTOR(1 downto 0) := "01";
+
+    -- ค่าตำแหน่งชั้น
+    constant POS_FLOOR_1 : integer := 0;
+    constant POS_FLOOR_2 : integer := 5000;
+    constant POS_FLOOR_3 : integer := 10000;
+    constant TOLERANCE   : integer := 50;
 
 begin
 
+    -- ==========================================
+    -- Port Mapping
+    -- ==========================================
+
+    Inst_UART_RX: UART_RX PORT MAP(
+        clk        => clk,
+        rst        => rst,
+        rx_in      => rx_in,
+        rx_data    => sig_rx_data,
+        data_ready => sig_rx_ready
+    );
+
+    Inst_UART_TX: UART_TX PORT MAP(
+        clk      => clk,
+        rst      => rst,
+        tx_data  => sig_tx_data,
+        tx_start => sig_tx_start,
+        tx_out   => tx_out,
+        tx_busy  => sig_tx_busy
+    );
+
+    Inst_Tracker: Floor_Position_Tracker PORT MAP(
+        clk         => clk,
+        rst         => rst,
+        pulse_in    => pulse_in,
+        dir_up      => sig_motor_dir,
+        current_pos => sig_current_pos
+    );
+
+    Inst_FSM: Elevator_FSM PORT MAP(
+        clk          => clk,
+        rst          => rst,
+        target_floor => reg_target_floor,
+        current_pos  => sig_current_pos,
+        door_hold    => door_hold,
+        motor_run    => sig_motor_run,
+        motor_dir    => sig_motor_dir,
+        door_led     => door_led
+    );
+
+    -- ==========================================
+    -- Process 1: Command Parser
+    -- สวิตมี Priority สูงกว่า UART
+    -- ==========================================
     process(clk, rst)
     begin
         if rst = '1' then
-            pulse_meta  <= '0';
-            pulse_sync  <= "00";
-            pos_counter <= 0;
-
+            reg_target_floor <= "01";
         elsif rising_edge(clk) then
-
-            -- [แก้ไข] 3-Stage Pipeline ที่ชัดเจน
-            -- Stage 1: รับสัญญาณภายนอก กัน Metastability
-            pulse_meta    <= pulse_in;
-            -- Stage 2: Stabilize
-            pulse_sync(0) <= pulse_meta;
-            -- Stage 3: เก็บค่าก่อนหน้าไว้เปรียบเทียบ
-            pulse_sync(1) <= pulse_sync(0);
-
-            -- ดัก Rising Edge: ค่าก่อนหน้า='0' และค่าปัจจุบัน='1'
-            if pulse_sync(1) = '0' and pulse_sync(0) = '1' then
-
-                -- มี pulse เข้ามา เช็คทิศทางแล้วบวก/ลบตำแหน่ง
-                if dir_up = '1' then
-                    -- วิ่งขึ้น: บวก 1 (มี guard ป้องกัน overflow)
-                    if pos_counter < 65535 then
-                        pos_counter <= pos_counter + 1;
-                    end if;
-                else
-                    -- วิ่งลง: ลบ 1 (มี guard ป้องกัน underflow)
-                    if pos_counter > 0 then
-                        pos_counter <= pos_counter - 1;
-                    end if;
+            -- สวิตออฟไลน์ (Priority สูงสุด)
+            if sw_floor1 = '1' then
+                reg_target_floor <= "01";
+            elsif sw_floor2 = '1' then
+                reg_target_floor <= "10";
+            elsif sw_floor3 = '1' then
+                reg_target_floor <= "11";
+            -- UART จาก ESP32 (ถ้าไม่มีสวิตกด)
+            elsif sig_rx_ready = '1' then
+                if sig_rx_data = x"31" then
+                    reg_target_floor <= "01";
+                elsif sig_rx_data = x"32" then
+                    reg_target_floor <= "10";
+                elsif sig_rx_data = x"33" then
+                    reg_target_floor <= "11";
                 end if;
-
             end if;
         end if;
     end process;
 
-    -- แปลง Integer → 16-bit STD_LOGIC_VECTOR ส่งให้ FSM
-    current_pos <= std_logic_vector(to_unsigned(pos_counter, 16));
+    -- ==========================================
+    -- Process 2: Motor Driver (L298N)
+    -- ==========================================
+    process(clk, rst)
+    begin
+        if rst = '1' then
+            ena_pwm <= '0';
+            in1_dir <= '0';
+            in2_dir <= '0';
+        elsif rising_edge(clk) then
+            if sig_motor_run = '1' then
+                ena_pwm <= '1';
+                if sig_motor_dir = '1' then
+                    in1_dir <= '1'; in2_dir <= '0';  -- ขึ้น
+                else
+                    in1_dir <= '0'; in2_dir <= '1';  -- ลง
+                end if;
+            else
+                ena_pwm <= '0';
+                in1_dir <= '0'; in2_dir <= '0';  -- เบรค
+            end if;
+        end if;
+    end process;
 
-end Behavioral;
+    -- ==========================================
+    -- Process 3: แปลงตำแหน่ง → ชั้นปัจจุบัน
+    -- ==========================================
+    process(clk, rst)
+        variable pos_int : integer range 0 to 65535;
+    begin
+        if rst = '1' then
+            sig_current_floor <= "01";
+        elsif rising_edge(clk) then
+            pos_int := to_integer(unsigned(sig_current_pos));
+
+            if pos_int <= (POS_FLOOR_1 + TOLERANCE) then
+                sig_current_floor <= "01";
+            elsif (pos_int >= POS_FLOOR_2 - TOLERANCE) and
+                  (pos_int <= POS_FLOOR_2 + TOLERANCE) then
+                sig_current_floor <= "10";
+            elsif pos_int >= (POS_FLOOR_3 - TOLERANCE) then
+                sig_current_floor <= "11";
+            -- กำลังเคลื่อนที่ → คงค่าชั้นล่าสุด
+            end if;
+        end if;
+    end process;
+
+    -- ==========================================
+    -- Process 4: 7-Segment Display (Common Cathode)
+    -- ==========================================
+    process(clk, rst)
+    begin
+        if rst = '1' then
+            seg_out <= "0000110";  -- แสดง '1' ตอน reset
+        elsif rising_edge(clk) then
+            case sig_current_floor is
+                when "01"   => seg_out <= "0000110";  -- 1
+                when "10"   => seg_out <= "1011011";  -- 2
+                when "11"   => seg_out <= "1001111";  -- 3
+                when others => seg_out <= "0000110";  -- default = 1
+            end case;
+        end if;
+    end process;
+
+    -- ==========================================
+    -- Process 5: ส่งสถานะชั้นกลับ ESP32 ผ่าน UART TX
+    -- ส่งเฉพาะตอนชั้นเปลี่ยนเท่านั้น
+    -- ==========================================
+    process(clk, rst)
+    begin
+        if rst = '1' then
+            sig_last_floor <= "01";
+            sig_tx_start   <= '0';
+            sig_tx_data    <= (others => '0');
+        elsif rising_edge(clk) then
+            sig_tx_start <= '0';  -- default ไม่ส่ง
+
+            -- ตรวจว่าชั้นเปลี่ยนหรือไม่
+            if sig_current_floor /= sig_last_floor and sig_tx_busy = '0' then
+                sig_last_floor <= sig_current_floor;
+
+                -- แปลงชั้น → ASCII แล้วส่ง
+                case sig_current_floor is
+                    when "01"   => sig_tx_data <= x"31";  -- '1'
+                    when "10"   => sig_tx_data <= x"32";  -- '2'
+                    when "11"   => sig_tx_data <= x"33";  -- '3'
+                    when others => sig_tx_data <= x"31";
+                end case;
+
+                sig_tx_start <= '1';  -- pulse 1 cycle เพื่อสั่งส่ง
+            end if;
+        end if;
+    end process;
+
+end Structural;
