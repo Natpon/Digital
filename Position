@@ -4,26 +4,22 @@ use IEEE.NUMERIC_STD.ALL;
 
 entity Floor_Position_Tracker is
     Port ( 
-        clk         : in  STD_LOGIC;  -- สัญญาณนาฬิกาหลักของบอร์ด
-        rst         : in  STD_LOGIC;  -- ปุ่ม Reset (Active High)
-        pulse_in    : in  STD_LOGIC;  -- สัญญาณพัลส์ที่ได้จากการหมุนของมอเตอร์/Encoder
-        dir_up      : in  STD_LOGIC;  -- ทิศทางมอเตอร์: '1' = ลิฟต์กำลังขึ้น, '0' = ลิฟต์กำลังลง
-        
-        current_pos : out STD_LOGIC_VECTOR (15 downto 0) -- ค่าตำแหน่งที่นับได้ (0 ถึง 65535)
+        clk         : in  STD_LOGIC;
+        rst         : in  STD_LOGIC;
+        pulse_in    : in  STD_LOGIC;
+        dir_up      : in  STD_LOGIC;
+        current_pos : out STD_LOGIC_VECTOR (15 downto 0)
     );
 end Floor_Position_Tracker;
 
 architecture Behavioral of Floor_Position_Tracker is
 
-    -- [แก้ไข] แยก Synchronizer ออกจาก Edge Detector ให้ชัดเจน
-    -- ชั้นที่ 1: รับสัญญาณภายนอก กัน Metastability
+    -- Stage 1: กัน Metastability จาก encoder ภายนอก
     signal pulse_meta  : STD_LOGIC := '0';
-    -- ชั้นที่ 2-3: Stabilize + Edge Detection
-    -- pulse_sync(0) = ค่าปัจจุบัน (หลัง stabilize)
-    -- pulse_sync(1) = ค่าก่อนหน้า (ไว้เปรียบเทียบหา rising edge)
+    -- Stage 2-3: Stabilize + Edge Detection
+    -- pulse_sync(0) = ค่าปัจจุบัน, pulse_sync(1) = ค่าก่อนหน้า
     signal pulse_sync  : STD_LOGIC_VECTOR(1 downto 0) := "00";
 
-    -- ตัวแปรเก็บค่าตำแหน่งปัจจุบัน (เริ่มต้นที่ 0 = ชั้น 1)
     signal pos_counter : integer range 0 to 65535 := 0;
 
 begin
@@ -37,31 +33,26 @@ begin
 
         elsif rising_edge(clk) then
 
-            -- [แก้ไข] 3-Stage Pipeline ที่ชัดเจน
-            -- Stage 1: รับสัญญาณภายนอก กัน Metastability
-            pulse_meta    <= pulse_in;
-            -- Stage 2: Stabilize
-            pulse_sync(0) <= pulse_meta;
-            -- Stage 3: เก็บค่าก่อนหน้าไว้เปรียบเทียบ
-            pulse_sync(1) <= pulse_sync(0);
+            -- 3-Stage Synchronizer + Edge Detector
+            pulse_meta    <= pulse_in;       -- Stage 1: กัน Metastability
+            pulse_sync(0) <= pulse_meta;     -- Stage 2: Stabilize
+            pulse_sync(1) <= pulse_sync(0);  -- Stage 3: เก็บค่าก่อนหน้า
 
             -- ดัก Rising Edge: ค่าก่อนหน้า='0' และค่าปัจจุบัน='1'
             if pulse_sync(1) = '0' and pulse_sync(0) = '1' then
-
-                -- มี pulse เข้ามา เช็คทิศทางแล้วบวก/ลบตำแหน่ง
                 if dir_up = '1' then
-                    -- วิ่งขึ้น: บวก 1 (มี guard ป้องกัน overflow)
+                    -- วิ่งขึ้น: บวก 1 (guard ป้องกัน overflow)
                     if pos_counter < 65535 then
                         pos_counter <= pos_counter + 1;
                     end if;
                 else
-                    -- วิ่งลง: ลบ 1 (มี guard ป้องกัน underflow)
+                    -- วิ่งลง: ลบ 1 (guard ป้องกัน underflow)
                     if pos_counter > 0 then
                         pos_counter <= pos_counter - 1;
                     end if;
                 end if;
-
             end if;
+
         end if;
     end process;
 
@@ -69,4 +60,3 @@ begin
     current_pos <= std_logic_vector(to_unsigned(pos_counter, 16));
 
 end Behavioral;
-
