@@ -8,9 +8,7 @@ entity Elevator_FSM is
         rst          : in  STD_LOGIC;
         target_floor : in  STD_LOGIC_VECTOR (1 downto 0);
         current_pos  : in  STD_LOGIC_VECTOR (15 downto 0);
-        -- [เพิ่มใหม่] ปุ่ม Hold ประตู (Active High = กดค้าง)
         door_hold    : in  STD_LOGIC;
-
         motor_run    : out STD_LOGIC;
         motor_dir    : out STD_LOGIC;
         door_led     : out STD_LOGIC
@@ -22,22 +20,17 @@ architecture Behavioral of Elevator_FSM is
     type state_type is (IDLE, MOVING_UP, MOVING_DOWN, DOOR_OPEN);
     signal state : state_type := IDLE;
 
-    -- ตั้งค่าตำแหน่งชั้น (ต้องจูนหน้างานจริง)
     constant POS_FLOOR_1 : integer := 0;
     constant POS_FLOOR_2 : integer := 5000;
     constant POS_FLOOR_3 : integer := 10000;
     constant TOLERANCE   : integer := 50;
 
-    -- [แก้ไข] เปลี่ยนจาก 3 วินาที เป็น 5 วินาที
-    -- 50,000,000 x 5 = 250,000,000 รอบ
+    -- 5 วินาที ที่ 50MHz = 250,000,000
     constant TIME_5_SEC  : integer := 250000000;
 
-    -- [แก้ไข] เปลี่ยน delay_timer จาก integer เป็น unsigned(27 downto 0)
-    -- ต้องการ 28 bits เพื่อรองรับค่าสูงสุด 250,000,000
+    -- ใช้ unsigned(27 downto 0) รองรับค่าสูงสุด 250,000,000 (ต้องการ 28 bits)
     signal delay_timer   : unsigned(27 downto 0) := (others => '0');
 
-    -- [แก้ไข] target_pos เปลี่ยนเป็น registered signal (ไม่ใช่ combinational)
-    -- เพื่อป้องกันการเปลี่ยน target กลางคัน
     signal target_pos    : integer range 0 to 65535 := 0;
     signal pos_int       : integer range 0 to 65535;
 
@@ -45,7 +38,6 @@ begin
 
     pos_int <= to_integer(unsigned(current_pos));
 
-    -- State Machine หลัก (ทำงานตามจังหวะ Clock)
     process(clk, rst)
     begin
         if rst = '1' then
@@ -59,13 +51,12 @@ begin
         elsif rising_edge(clk) then
             case state is
 
-                -- จอดรอคำสั่ง
                 when IDLE =>
                     motor_run   <= '0';
                     door_led    <= '0';
                     delay_timer <= (others => '0');
 
-                    -- [แก้ไข] รับ target_floor ใหม่เฉพาะตอน IDLE เท่านั้น
+                    -- รับ target_floor ใหม่เฉพาะตอน IDLE เท่านั้น
                     -- ป้องกัน target เปลี่ยนกลางคันขณะลิฟต์กำลังวิ่ง
                     case target_floor is
                         when "01"   => target_pos <= POS_FLOOR_1;
@@ -74,27 +65,24 @@ begin
                         when others => target_pos <= POS_FLOOR_1;
                     end case;
 
-                    -- [แก้ไข] ป้องกัน Integer Underflow กรณี target_pos = 0 (ชั้น 1)
-                    -- ต้องเช็คว่า target_pos > TOLERANCE ก่อนทำการลบ
+                    -- ป้องกัน Integer Underflow กรณี target_pos = 0 (ชั้น 1)
                     if (target_pos > TOLERANCE) and (pos_int < target_pos - TOLERANCE) then
                         state <= MOVING_UP;
                     elsif pos_int > (target_pos + TOLERANCE) then
                         state <= MOVING_DOWN;
                     end if;
 
-                -- กำลังวิ่งขึ้น
                 when MOVING_UP =>
                     motor_run <= '1';
                     motor_dir <= '1';
                     door_led  <= '0';
 
-                    -- [แก้ไข] ป้องกัน Integer Underflow เช่นเดียวกับ IDLE
+                    -- ป้องกัน Underflow กรณี target_pos <= TOLERANCE
                     if (target_pos <= TOLERANCE) or (pos_int >= target_pos - TOLERANCE) then
                         motor_run <= '0';
                         state     <= DOOR_OPEN;
                     end if;
 
-                -- กำลังวิ่งลง
                 when MOVING_DOWN =>
                     motor_run <= '1';
                     motor_dir <= '0';
@@ -105,18 +93,17 @@ begin
                         state     <= DOOR_OPEN;
                     end if;
 
-                -- สถานะเปิดประตู รอคนเข้า-ออก
                 when DOOR_OPEN =>
                     motor_run <= '0';
                     door_led  <= '1';
 
-                    -- [เพิ่มใหม่] ถ้ากด door_hold ค้างไว้ → รีเซ็ตตัวนับตลอด (ประตูค้างเปิด)
-                    -- ถ้าไม่ได้กด → นับเวลาปกติ 5 วินาที แล้วปิดประตู
                     if door_hold = '1' then
+                        -- กด Hold ค้างไว้ → รีเซ็ตตัวนับ (ประตูค้างเปิด)
                         delay_timer <= (others => '0');
                     elsif delay_timer < to_unsigned(TIME_5_SEC, 28) then
                         delay_timer <= delay_timer + 1;
                     else
+                        -- ครบ 5 วินาที → ปิดประตู กลับ IDLE
                         delay_timer <= (others => '0');
                         door_led    <= '0';
                         state       <= IDLE;
@@ -127,4 +114,3 @@ begin
     end process;
 
 end Behavioral;
-
