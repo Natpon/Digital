@@ -1,128 +1,165 @@
-library IEEE;
-use IEEE.STD_LOGIC_1164.ALL;
-use IEEE.NUMERIC_STD.ALL;
-
-entity Elevator_FSM is
-    Port (
-        clk          : in  STD_LOGIC;
-        rst          : in  STD_LOGIC;
-        target_floor : in  STD_LOGIC_VECTOR(15 downto 0);
-        current_pos  : in  STD_LOGIC_VECTOR(15 downto 0);
-        door_hold    : in  STD_LOGIC;
-        motor_run    : out STD_LOGIC;
-        motor_dir    : out STD_LOGIC;
-        seg_common   : out STD_LOGIC_VECTOR(3 downto 0);
-        door_led     : out STD_LOGIC_VECTOR(4 downto 0);
-        door_beep    : out STD_LOGIC
-    );
-end Elevator_FSM;
-
-architecture Behavioral of Elevator_FSM is
-    type fsm_state is (IDLE, MOVING_UP, MOVING_DOWN, DOOR_OPEN, BEEPING);
-    signal state : fsm_state := IDLE;
-
-    constant TOLERANCE     : integer := 50;
-    constant TIME_1_SEC    : unsigned(27 downto 0) := to_unsigned(20000000, 28);
-    constant TIME_HALF_SEC : unsigned(27 downto 0) := to_unsigned(10000000, 28);
-
-    signal delay_timer    : unsigned(27 downto 0) := (others => '0');
-    signal sec_counter    : integer range 0 to 5 := 0;
-    signal latched_target : integer := 0;
-    signal current_val    : integer := 0;
-    signal prev_target    : integer := 0;
-
-begin
-    current_val <= to_integer(unsigned(current_pos));
-
-    process(clk, rst)
-    begin
-        if rst = '1' then
-            state          <= IDLE;
-            motor_run      <= '0';
-            motor_dir      <= '0';
-            door_led       <= (others => '0');
-            door_beep      <= '0';
-            seg_common     <= "1111";
-            delay_timer    <= (others => '0');
-            sec_counter    <= 0;
-            latched_target <= 0;
-            prev_target    <= 0;
-        elsif rising_edge(clk) then
-            motor_run  <= '0';
-            door_led   <= (others => '0');
-            door_beep  <= '0';
-            seg_common <= "0000";
-
-            case state is
-                when IDLE =>
-                    latched_target <= to_integer(unsigned(target_floor));
-                    if to_integer(unsigned(target_floor)) > current_val + TOLERANCE then
-                        state <= MOVING_UP;
-                    elsif to_integer(unsigned(target_floor)) + TOLERANCE < current_val then
-                        state <= MOVING_DOWN;
-                    elsif to_integer(unsigned(target_floor)) /= prev_target then
-                        state       <= DOOR_OPEN;
-                        sec_counter <= 0;
-                    end if;
-                    prev_target <= to_integer(unsigned(target_floor));
-
-                when MOVING_UP =>
-                    motor_run <= '1';
-                    motor_dir <= '1';
-                    if (to_integer(unsigned(target_floor)) < latched_target) and
-                       (to_integer(unsigned(target_floor)) > current_val + TOLERANCE) then
-                        latched_target <= to_integer(unsigned(target_floor));
-                    end if;
-                    if current_val >= latched_target - TOLERANCE then
-                        state       <= DOOR_OPEN;
-                        sec_counter <= 0;
-                    end if;
-
-                when MOVING_DOWN =>
-                    motor_run <= '1';
-                    motor_dir <= '0';
-                    if (to_integer(unsigned(target_floor)) > latched_target) and
-                       (to_integer(unsigned(target_floor)) < current_val - TOLERANCE) then
-                        latched_target <= to_integer(unsigned(target_floor));
-                    end if;
-                    if current_val <= latched_target + TOLERANCE then
-                        state       <= DOOR_OPEN;
-                        sec_counter <= 0;
-                    end if;
-
-                when DOOR_OPEN =>
-                    case sec_counter is
-                        when 0      => door_led <= "11111";
-                        when 1      => door_led <= "01111";
-                        when 2      => door_led <= "00111";
-                        when 3      => door_led <= "00011";
-                        when 4      => door_led <= "00001";
-                        when others => door_led <= "00000";
-                    end case;
-                    if door_hold = '1' then
-                        delay_timer <= (others => '0');
-                        sec_counter <= 0;
-                    elsif delay_timer = TIME_1_SEC - 1 then
-                        delay_timer <= (others => '0');
-                        if sec_counter = 4 then
-                            state       <= BEEPING;
-                            sec_counter <= 0;
-                        else
-                            sec_counter <= sec_counter + 1;
-                        end if;
-                    else
-                        delay_timer <= delay_timer + 1;
-                    end if;
-
-                when BEEPING =>
-                    door_beep <= '1';
-                    if delay_timer = TIME_HALF_SEC - 1 then
-                        delay_timer <= (others => '0');
-                        state       <= IDLE;
-                    else
-                        delay_timer <= delay_timer + 1;
-                    end if;
-            end case;
-        end if;
-    end process;
-end Behavioral;
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(1): Syntax error.  Ensure
+   that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(2): Syntax error.  Ensure
+   that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(3): Syntax error.  Ensure
+   that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(6): Syntax error.  Ensure
+   that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(8): Unable to resolve
+   constraint association type "rst". "rst" is not a valid constraint type for
+   association in the "UCF" constraint format.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(9): Unable to resolve
+   constraint association type "sw_floor1". "sw_floor1" is not a valid
+   constraint type for association in the "UCF" constraint format.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(10): Unable to resolve
+   constraint association type "sw_floor2". "sw_floor2" is not a valid
+   constraint type for association in the "UCF" constraint format.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(11): Unable to resolve
+   constraint association type "sw_floor3". "sw_floor3" is not a valid
+   constraint type for association in the "UCF" constraint format.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(12): Unable to resolve
+   constraint association type "door_hold". "door_hold" is not a valid
+   constraint type for association in the "UCF" constraint format.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(13): Unable to resolve
+   constraint association type "pulse_in". "pulse_in" is not a valid constraint
+   type for association in the "UCF" constraint format.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(14): Unable to resolve
+   constraint association type "rx_in". "rx_in" is not a valid constraint type
+   for association in the "UCF" constraint format.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(15): Unable to resolve
+   constraint association type "ena_pwm". "ena_pwm" is not a valid constraint
+   type for association in the "UCF" constraint format.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(16): Unable to resolve
+   constraint association type "in1_dir". "in1_dir" is not a valid constraint
+   type for association in the "UCF" constraint format.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(17): Unable to resolve
+   constraint association type "in2_dir". "in2_dir" is not a valid constraint
+   type for association in the "UCF" constraint format.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(18): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(19): Unable to resolve
+   constraint association type "door_beep". "door_beep" is not a valid
+   constraint type for association in the "UCF" constraint format.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(20): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(21): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(23): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(24): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(26): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(28): Unable to resolve
+   constraint association type "signal". "signal" is not a valid constraint type
+   for association in the "UCF" constraint format.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(29): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(30): Unable to resolve
+   constraint association type "signal". "signal" is not a valid constraint type
+   for association in the "UCF" constraint format.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(31): Unable to resolve
+   constraint association type "signal". "signal" is not a valid constraint type
+   for association in the "UCF" constraint format.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(33): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(34): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(35): Unable to resolve
+   constraint association type "signal". "signal" is not a valid constraint type
+   for association in the "UCF" constraint format.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(36): Unable to resolve
+   constraint association type "signal". "signal" is not a valid constraint type
+   for association in the "UCF" constraint format.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(37): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(38): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(40): Unable to resolve
+   constraint association type "constant". "constant" is not a valid constraint
+   type for association in the "UCF" constraint format.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(41): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(42): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(44): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(45): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(46): Unable to resolve
+   constraint association type "signal". "signal" is not a valid constraint type
+   for association in the "UCF" constraint format.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(48): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(49): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(50): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(53): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(59): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(64): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(68): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(73): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(77): Invalid parameter:
+   '<' for constraint type 'db2_cnt':
+   This constraint type cannot accept the 'NAME' value as a parameter.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(77): Invalid parameter:
+   '<' for constraint type 'db3_cnt':
+   This constraint type cannot accept the 'NAME' value as a parameter.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(78): Invalid parameter:
+   '<' for constraint type 'sw1_db':
+   This constraint type cannot accept the 'NAME' value as a parameter.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(78): Invalid parameter:
+   '<' for constraint type 'sw2_db':
+   This constraint type cannot accept the 'NAME' value as a parameter.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(78): Invalid parameter:
+   '<' for constraint type 'sw3_db':
+   This constraint type cannot accept the 'NAME' value as a parameter.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(80): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(83): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(83): Invalid parameter:
+   '<' for constraint type 'sw1_db':
+   This constraint type cannot accept the 'NAME' value as a parameter.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(85): Unable to resolve
+   constraint association type "else". "else" is not a valid constraint type for
+   association in the "UCF" constraint format.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(86): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(89): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(91): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(91): Invalid parameter:
+   '<' for constraint type 'sw2_db':
+   This constraint type cannot accept the 'NAME' value as a parameter.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(93): Unable to resolve
+   constraint association type "else". "else" is not a valid constraint type for
+   association in the "UCF" constraint format.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(94): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(97): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(99): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(99): Invalid parameter:
+   '<' for constraint type 'sw3_db':
+   This constraint type cannot accept the 'NAME' value as a parameter.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(101): Unable to resolve
+   constraint association type "else". "else" is not a valid constraint type for
+   association in the "UCF" constraint format.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(102): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(103): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(104): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
+ERROR:ConstraintSystem:300 - In file: Elevator_Top.ucf(106): Syntax error. 
+   Ensure that the previous constraint specification was terminated with ';'.
