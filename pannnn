@@ -1,0 +1,80 @@
+## --- Clock & Reset ---
+
+NET "clk"        LOC = "P123" | IOSTANDARD = LVCMOS33; # OSC จากตาราง
+
+NET "rst"        LOC = "P55"  | IOSTANDARD = LVCMOS33; # ใช้ SW7(PB6) เป็น Reset
+
+
+
+## --- Motor Driver (L298N) @ K6 Connector ---
+
+NET "ena_pwm"    LOC = "P112" | IOSTANDARD = LVCMOS33; # K6 Pin 2 (FPGA P112)
+
+NET "in1_dir"    LOC = "P111" | IOSTANDARD = LVCMOS33; # K6 Pin 4 (FPGA P111)
+
+NET "in2_dir"    LOC = "P105" | IOSTANDARD = LVCMOS33; # K6 Pin 6 (FPGA P105)
+
+
+
+## --- Sensors & Comm @ K4 Connector ---
+
+NET "pulse_in"   LOC = "P137" | IOSTANDARD = LVCMOS33; # K4 Pin 10 (FPGA P137)
+
+NET "rx_in"      LOC = "P133" | IOSTANDARD = LVCMOS33; # K4 Pin 12 (FPGA P133)
+
+NET "tx_out"     LOC = "P131" | IOSTANDARD = LVCMOS33; # K4 Pin 14 (FPGA P131)
+
+NET "door_hold"  LOC = "P126" | IOSTANDARD = LVCMOS33; # K4 Pin 16 (FPGA P126)
+
+
+
+## --- Inputs (Switches) ---
+
+NET "sw_floor1"  LOC = "P45"  | IOSTANDARD = LVCMOS33; # SW0
+
+NET "sw_floor2"  LOC = "P46"  | IOSTANDARD = LVCMOS33; # SW1
+
+NET "sw_floor3"  LOC = "P47"  | IOSTANDARD = LVCMOS33; # SW2
+
+
+
+## แก้ไขส่วน 7-Segment ให้เป็น LVCMOS33 ทั้งหมด
+
+NET "seg_out<0>" LOC = "P41"  | IOSTANDARD = LVCMOS33;
+
+NET "seg_out<1>" LOC = "P40"  | IOSTANDARD = LVCMOS33;
+
+NET "seg_out<2>" LOC = "P35"  | IOSTANDARD = LVCMOS33;
+
+NET "seg_out<3>" LOC = "P34"  | IOSTANDARD = LVCMOS33;
+
+NET "seg_out<4>" LOC = "P32"  | IOSTANDARD = LVCMOS33;
+
+NET "seg_out<5>" LOC = "P29"  | IOSTANDARD = LVCMOS33;
+
+NET "seg_out<6>" LOC = "P27"  | IOSTANDARD = LVCMOS33;
+
+
+
+## ส่วนของ Common ก็ต้องเป็น LVCMOS33 เช่นกัน
+
+NET "seg_common<0>" LOC = "P44" | IOSTANDARD = LVCMOS33;
+
+
+NET "seg_common<1>" LOC = "P43" | IOSTANDARD = LVCMOS33;
+
+NET "seg_common<2>" LOC = "P33" | IOSTANDARD = LVCMOS33;
+
+NET "seg_common<3>" LOC = "P30" | IOSTANDARD = LVCMOS33; 
+
+## --- Indicators ---
+
+NET "door_led"   LOC = "P82"  | IOSTANDARD = LVCMOS33; # L0 (LED ดวงแรก)
+
+
+
+## --- Timing Constraints ---
+
+NET "clk" TNM_NET = clk;
+
+TIMESPEC TS_clk = PERIOD "clk" 50 ns HIGH 50%; # 20MHz = 50ns
