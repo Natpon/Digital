@@ -1,0 +1,175 @@
+library IEEE;
+
+use IEEE.STD_LOGIC_1164.ALL;
+
+use IEEE.NUMERIC_STD.ALL;
+
+
+
+entity Elevator_FSM is
+
+    Port (
+
+        clk          : in  STD_LOGIC;
+
+        rst          : in  STD_LOGIC;
+
+        target_floor : in  STD_LOGIC_VECTOR(15 downto 0);
+
+        current_pos  : in  STD_LOGIC_VECTOR(15 downto 0);
+
+        door_hold    : in  STD_LOGIC;
+
+        motor_run    : out STD_LOGIC;
+
+        motor_dir    : out STD_LOGIC;
+
+      
+		  seg_common : out STD_LOGIC_VECTOR(3 downto 0);
+		  door_led     : out STD_LOGIC
+
+    );
+
+end Elevator_FSM;
+
+
+
+architecture Behavioral of Elevator_FSM is
+
+    type fsm_state is (IDLE, MOVING_UP, MOVING_DOWN, DOOR_OPEN);
+
+    signal state : fsm_state := IDLE;
+
+    
+
+    constant TOLERANCE : integer := 50;
+
+    constant TIME_5_SEC : unsigned(27 downto 0) := to_unsigned(100000000, 28);
+
+    
+
+    signal delay_timer : unsigned(27 downto 0) := (others => '0');
+
+    signal latched_target : integer := 0;
+
+    signal current_val : integer := 0;
+	 
+	 
+
+begin
+
+    current_val <= to_integer(unsigned(current_pos));
+
+
+
+    process(clk, rst)
+
+    begin
+
+        if rst = '1' then
+
+            state <= IDLE;
+
+            motor_run <= '0';
+
+            motor_dir <= '0';
+
+            door_led <= '0';
+
+            delay_timer <= (others => '0');
+
+            latched_target <= 0;
+
+        elsif rising_edge(clk) then
+
+            case state is
+
+                when IDLE =>
+
+                    motor_run <= '0';
+
+                    door_led <= '0';
+
+                    -- Latch target only in IDLE
+
+                    latched_target <= to_integer(unsigned(target_floor));
+
+                    
+
+                    if latched_target > current_val + TOLERANCE then
+
+                        state <= MOVING_UP;
+
+                    elsif (latched_target + TOLERANCE < current_val) and (current_val > TOLERANCE) then
+
+                        state <= MOVING_DOWN;
+
+                    end if;
+
+                    
+
+                when MOVING_UP =>
+
+                    motor_run <= '1';
+
+                    motor_dir <= '1';
+
+                    if current_val >= latched_target - TOLERANCE then
+
+                        motor_run <= '0';
+
+                        state <= DOOR_OPEN;
+
+                    end if;
+
+                    
+
+                when MOVING_DOWN =>
+
+                    motor_run <= '1';
+
+                    motor_dir <= '0';
+
+                    if current_val <= latched_target + TOLERANCE then
+
+                        motor_run <= '0';
+
+                        state <= DOOR_OPEN;
+
+                    end if;
+
+                    
+
+                when DOOR_OPEN =>
+
+                    door_led <= '1';
+
+                    if door_hold = '1' then
+
+                        delay_timer <= (others => '0'); -- Reset timer if hold pressed
+
+                    else
+
+                        if delay_timer = TIME_5_SEC - 1 then
+
+                            delay_timer <= (others => '0');
+
+                            door_led <= '0';
+
+                            state <= IDLE;
+
+                        else
+
+                            delay_timer <= delay_timer + 1;
+
+                        end if;
+
+                    end if;
+
+            end case;
+
+        end if;
+
+    end process;
+
+end Behavioral;
