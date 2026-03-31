@@ -1,0 +1,6 @@
+ERROR:HDLCompiler:32 - "/home/ise/Desktop/pon_lift-20260331T062329Z-3-001/pon_lift/Elevator_FSM.vhd" Line 21: <door_beep> is already declared in this region.
+ERROR:HDLCompiler:288 - "/home/ise/Desktop/pon_lift-20260331T062329Z-3-001/pon_lift/Elevator_FSM.vhd" Line 108: Cannot read from 'out' object door_beep ; use 'buffer' or 'inout'
+ERROR:HDLCompiler:1728 - "/home/ise/Desktop/pon_lift-20260331T062329Z-3-001/pon_lift/Elevator_FSM.vhd" Line 108: Type error near door_beep ; current type std_logic; expected type fsm_state
+ERROR:HDLCompiler:288 - "/home/ise/Desktop/pon_lift-20260331T062329Z-3-001/pon_lift/Elevator_FSM.vhd" Line 117: Cannot read from 'out' object door_beep ; use 'buffer' or 'inout'
+ERROR:HDLCompiler:1728 - "/home/ise/Desktop/pon_lift-20260331T062329Z-3-001/pon_lift/Elevator_FSM.vhd" Line 117: Type error near door_beep ; current type std_logic; expected type fsm_state
+ERROR:HDLCompiler:854 - "/home/ise/Desktop/pon_lift-20260331T062329Z-3-001/pon_lift/Elevator_FSM.vhd" Line 20: Unit <behavioral> ignored due to previous errors.
