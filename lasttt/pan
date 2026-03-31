@@ -1,0 +1,39 @@
+NET "clk"           LOC = "P123" | IOSTANDARD = LVCMOS33;
+NET "rst"           LOC = "P55"  | IOSTANDARD = LVCMOS33;
+
+NET "ena_pwm"       LOC = "P112" | IOSTANDARD = LVCMOS33;
+NET "in1_dir"       LOC = "P111" | IOSTANDARD = LVCMOS33;
+NET "in2_dir"       LOC = "P105" | IOSTANDARD = LVCMOS33;
+
+NET "pulse_in"      LOC = "P137" | IOSTANDARD = LVCMOS33;
+NET "rx_in"         LOC = "P133" | IOSTANDARD = LVCMOS33;
+NET "tx_out"        LOC = "P131" | IOSTANDARD = LVCMOS33;
+NET "door_hold"     LOC = "P66"  | IOSTANDARD = LVCMOS33;
+
+NET "sw_floor1"     LOC = "P45"  | IOSTANDARD = LVCMOS33;
+NET "sw_floor2"     LOC = "P46"  | IOSTANDARD = LVCMOS33;
+NET "sw_floor3"     LOC = "P47"  | IOSTANDARD = LVCMOS33;
+
+NET "seg_out<0>"    LOC = "P41"  | IOSTANDARD = LVCMOS33;
+NET "seg_out<1>"    LOC = "P40"  | IOSTANDARD = LVCMOS33;
+NET "seg_out<2>"    LOC = "P35"  | IOSTANDARD = LVCMOS33;
+NET "seg_out<3>"    LOC = "P34"  | IOSTANDARD = LVCMOS33;
+NET "seg_out<4>"    LOC = "P32"  | IOSTANDARD = LVCMOS33;
+NET "seg_out<5>"    LOC = "P29"  | IOSTANDARD = LVCMOS33;
+NET "seg_out<6>"    LOC = "P27"  | IOSTANDARD = LVCMOS33;
+
+NET "seg_common<0>" LOC = "P44"  | IOSTANDARD = LVCMOS33;
+NET "seg_common<1>" LOC = "P43"  | IOSTANDARD = LVCMOS33;
+NET "seg_common<2>" LOC = "P33"  | IOSTANDARD = LVCMOS33;
+NET "seg_common<3>" LOC = "P30"  | IOSTANDARD = LVCMOS33;
+
+NET "door_led<0>"   LOC = "P78"  | IOSTANDARD = LVCMOS33;
+NET "door_led<1>"   LOC = "P79"  | IOSTANDARD = LVCMOS33;
+NET "door_led<2>"   LOC = "P80"  | IOSTANDARD = LVCMOS33;
+NET "door_led<3>"   LOC = "P81"  | IOSTANDARD = LVCMOS33;
+NET "door_led<4>"   LOC = "P82"  | IOSTANDARD = LVCMOS33;
+
+NET "door_beep"     LOC = "P83"  | IOSTANDARD = LVCMOS33;
+
+NET "clk" TNM_NET = clk;
+TIMESPEC TS_clk = PERIOD "clk" 50 ns HIGH 50%;
