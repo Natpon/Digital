@@ -1,0 +1,79 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.STD_LOGIC_UNSIGNED.ALL; -- สำหรับการบวกเลขฐานสอง
+
+entity Spartan6_Motor_Top is
+    Port ( 
+        clk       : in  STD_LOGIC;          -- Clock หลักจากบอร์ด (เช่น 50MHz)
+        btn_fwd   : in  STD_LOGIC;          -- ปุ่มกดหรือสัญญาณจาก ESP32 (เดินหน้า)
+        btn_rev   : in  STD_LOGIC;          -- ปุ่มกดหรือสัญญาณจาก ESP32 (ถอยหลัง)
+        speed_in  : in  STD_LOGIC_VECTOR(7 downto 0); -- ค่าความเร็ว 0-255 จาก ESP32
+        
+        -- ขาที่จะต่อออกไปหา Level Shifter -> L298N
+        IN1       : out STD_LOGIC;
+        IN2       : out STD_LOGIC;
+        ENA       : out STD_LOGIC
+    );
+end Spartan6_Motor_Top;
+
+architecture Behavioral of Spartan6_Motor_Top is
+    -- สัญญาณภายใน (Internal Signals)
+    signal clk_pwm     : STD_LOGIC := '0';
+    signal pwm_count   : STD_LOGIC_VECTOR(7 downto 0) := (others => '0');
+    signal div_count   : integer range 0 to 2500 := 0; -- ตัวหาร Clock
+begin
+
+    ---------------------------------------------------------
+    -- 1. ส่วนลดความถี่ Clock (Clock Divider)
+    -- จาก 50MHz ลดลงมาเพื่อให้ PWM ทำงานที่ความถี่เหมาะสม (ประมาณ 10-20kHz)
+    ---------------------------------------------------------
+    process(clk)
+    begin
+        if rising_edge(clk) then
+            if div_count = 2500 then  -- หารด้วย 2500
+                div_count <= 0;
+                clk_pwm <= not clk_pwm; -- สร้าง Clock จำลองที่ช้าลง
+            else
+                div_count <= div_count + 1;
+            end if;
+        end if;
+    end process;
+
+    ---------------------------------------------------------
+    -- 2. ส่วนควบคุมทิศทาง (Direction & Safety Logic)
+    ---------------------------------------------------------
+    process(btn_fwd, btn_rev)
+    begin
+        if btn_fwd = '1' and btn_rev = '0' then
+            IN1 <= '1';
+            IN2 <= '0';
+        elsif btn_fwd = '0' and btn_rev = '1' then
+            IN1 <= '0';
+            IN2 <= '1';
+        else
+            -- ถ้ากดพร้อมกันหรือไม่ได้กด ให้หยุดมอเตอร์ (Brake/Stop)
+            IN1 <= '0';
+            IN2 <= '0';
+        end if;
+    end process;
+
+    ---------------------------------------------------------
+    -- 3. ส่วนสร้างสัญญาณ PWM (Speed Control)
+    -- ทำงานตามจังหวะ clk_pwm ที่เราแบ่งมาแล้ว
+    ---------------------------------------------------------
+    process(clk_pwm)
+    begin
+        if rising_edge(clk_pwm) then
+            -- ตัวนับ 0-255
+            pwm_count <= pwm_count + 1;
+            
+            -- สร้าง Duty Cycle โดยเทียบกับค่า speed_in
+            if pwm_count < speed_in then
+                ENA <= '1'; -- ปล่อยไฟ
+            else
+                ENA <= '0'; -- ตัดไฟ
+            end if;
+        end if;
+    end process;
+
+end Behavioral;
