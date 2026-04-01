@@ -1,75 +1,62 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
-use IEEE.STD_LOGIC_UNSIGNED.ALL; -- สำหรับการบวกเลขฐานสอง
+use IEEE.STD_LOGIC_UNSIGNED.ALL;
 
-entity Spartan6_Motor_Top is
+entity Elevator_Motor is
     Port ( 
-        clk       : in  STD_LOGIC;          -- Clock หลักจากบอร์ด (เช่น 50MHz)
-        btn_fwd   : in  STD_LOGIC;          -- ปุ่มกดหรือสัญญาณจาก ESP32 (เดินหน้า)
-        btn_rev   : in  STD_LOGIC;          -- ปุ่มกดหรือสัญญาณจาก ESP32 (ถอยหลัง)
-        speed_in  : in  STD_LOGIC_VECTOR(7 downto 0); -- ค่าความเร็ว 0-255 จาก ESP32
-        
-        -- ขาที่จะต่อออกไปหา Level Shifter -> L298N
+        clk       : in  STD_LOGIC; -- Clock หลักบอร์ด
+        btn_up    : in  STD_LOGIC; -- ปุ่มกดขึ้น
+        btn_down  : in  STD_LOGIC; -- ปุ่มกดลง
         IN1       : out STD_LOGIC;
         IN2       : out STD_LOGIC;
         ENA       : out STD_LOGIC
     );
-end Spartan6_Motor_Top;
+end Elevator_Motor;
 
-architecture Behavioral of Spartan6_Motor_Top is
-    -- สัญญาณภายใน (Internal Signals)
-    signal clk_pwm     : STD_LOGIC := '0';
-    signal pwm_count   : STD_LOGIC_VECTOR(7 downto 0) := (others => '0');
-    signal div_count   : integer range 0 to 2500 := 0; -- ตัวหาร Clock
+architecture Behavioral of Elevator_Motor is
+    -- *** ปรับความเร็วตรงนี้ (0-255) ***
+    -- 255 คือเร็วสุด / 128 คือครึ่งนึง / 64 คือช้ามาก
+    constant LIFT_SPEED : STD_LOGIC_VECTOR(7 downto 0) := "01000000"; -- ตัวอย่างตั้งไว้ที่ 64 (ช้าลง 4 เท่า)
+
+    signal clk_pwm    : STD_LOGIC := '0';
+    signal pwm_count  : STD_LOGIC_VECTOR(7 downto 0) := (others => '0');
+    signal div_count  : integer range 0 to 2500 := 0;
 begin
 
-    ---------------------------------------------------------
-    -- 1. ส่วนลดความถี่ Clock (Clock Divider)
-    -- จาก 50MHz ลดลงมาเพื่อให้ PWM ทำงานที่ความถี่เหมาะสม (ประมาณ 10-20kHz)
-    ---------------------------------------------------------
+    -- ส่วนลดความถี่เพื่อให้ L298N ทำงานได้ (Clock Divider)
     process(clk)
     begin
         if rising_edge(clk) then
-            if div_count = 2500 then  -- หารด้วย 2500
+            if div_count = 2500 then
                 div_count <= 0;
-                clk_pwm <= not clk_pwm; -- สร้าง Clock จำลองที่ช้าลง
+                clk_pwm <= not clk_pwm;
             else
                 div_count <= div_count + 1;
             end if;
         end if;
     end process;
 
-    ---------------------------------------------------------
-    -- 2. ส่วนควบคุมทิศทาง (Direction & Safety Logic)
-    ---------------------------------------------------------
-    process(btn_fwd, btn_rev)
+    -- ส่วนคุมทิศทางลิฟต์ (กดปุ่มไหนไปทางนั้น)
+    process(btn_up, btn_down)
     begin
-        if btn_fwd = '1' and btn_rev = '0' then
-            IN1 <= '1';
-            IN2 <= '0';
-        elsif btn_fwd = '0' and btn_rev = '1' then
-            IN1 <= '0';
-            IN2 <= '1';
+        if btn_up = '1' and btn_down = '0' then
+            IN1 <= '1'; IN2 <= '0';
+        elsif btn_up = '0' and btn_down = '1' then
+            IN1 <= '0'; IN2 <= '1';
         else
-            -- ถ้ากดพร้อมกันหรือไม่ได้กด ให้หยุดมอเตอร์ (Brake/Stop)
-            IN1 <= '0';
-            IN2 <= '0';
+            IN1 <= '0'; IN2 <= '0'; -- หยุด
         end if;
     end process;
 
-    ---------------------------------------------------------
-    -- 3. ส่วนสร้างสัญญาณ PWM (Speed Control)
-    -- ทำงานตามจังหวะ clk_pwm ที่เราแบ่งมาแล้ว
-    ---------------------------------------------------------
+    -- *** ส่วนที่คุมความเร็วที่คุณอยากรู้ ***
     process(clk_pwm)
     begin
         if rising_edge(clk_pwm) then
-            -- ตัวนับ 0-255
             pwm_count <= pwm_count + 1;
             
-            -- สร้าง Duty Cycle โดยเทียบกับค่า speed_in
-            if pwm_count < speed_in then
-                ENA <= '1'; -- ปล่อยไฟ
+            -- ใช้ค่าคงที่ LIFT_SPEED ที่เราตั้งไว้มาเทียบ
+            if pwm_count < LIFT_SPEED then
+                ENA <= '1'; -- จ่ายไฟ
             else
                 ENA <= '0'; -- ตัดไฟ
             end if;
