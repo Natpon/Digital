@@ -1,93 +1,60 @@
-# Clock and Reset
+# ==============================================================================
+#  Elevator Project Constraint File (UCF)
+#  Target Board: Spartan-6 (XC6SLX9) - ตัวอย่างอ้างอิงพินทั่วไป
+# ==============================================================================
 
-NET "clk"           LOC = "P123" | IOSTANDARD = LVCMOS33;
+# 1. ระบบควบคุมพื้นฐาน (Clock & Reset)
+# ------------------------------------------------------------------------------
+NET "clk"           LOC = "P123" | IOSTANDARD = LVCMOS33; # สัญญาณนาฬิกาบอร์ด (50MHz)
+NET "rst"           LOC = "P55"  | IOSTANDARD = LVCMOS33; # ปุ่ม Reset (กดเพื่อเริ่มระบบใหม่ทั้งหมด)
 
-NET "rst"           LOC = "P55"  | IOSTANDARD = LVCMOS33;
+# 2. ควบคุมมอเตอร์ลิฟต์ (ต่อเข้าบอร์ด L298N หรือ Driver อื่นๆ)
+# ------------------------------------------------------------------------------
+NET "ena_pwm"       LOC = "P112" | IOSTANDARD = LVCMOS33; # ต่อขา ENA (ควบคุมความเร็ว/Enable)
+NET "in1_dir"       LOC = "P111" | IOSTANDARD = LVCMOS33; # ต่อขา IN1 (ทิศทาง 1)
+NET "in2_dir"       LOC = "P105" | IOSTANDARD = LVCMOS33; # ต่อขา IN2 (ทิศทาง 2)
 
+# 3. เซ็นเซอร์และพอร์ตสื่อสาร (Input Sensors)
+# ------------------------------------------------------------------------------
+NET "pulse_in"      LOC = "P137" | IOSTANDARD = LVCMOS33; # ต่อขา Signal จาก Rotary Encoder / Optical Sensor
+NET "rx_in"         LOC = "P133" | IOSTANDARD = LVCMOS33; # ต่อขา TX ของ ESP32/UART (รับคำสั่งจากเน็ต/แอป)
+NET "tx_out"        LOC = "P131" | IOSTANDARD = LVCMOS33; # ต่อขา RX ของ ESP32/UART (ส่งสถานะไปโชว์ที่แอป)
+NET "door_hold"     LOC = "P66"  | IOSTANDARD = LVCMOS33; # สวิตช์กดค้างประตู (Photo-sensor หรือปุ่มกดค้าง)
 
+# 4. ปุ่มกดเรียกจากชั้นต่างๆ (Floor Call Switches)
+# ------------------------------------------------------------------------------
+NET "sw_floor1"     LOC = "P45"  | IOSTANDARD = LVCMOS33; # ปุ่มกดเรียก/สวิตช์ชั้น 1
+NET "sw_floor2"     LOC = "P46"  | IOSTANDARD = LVCMOS33; # ปุ่มกดเรียก/สวิตช์ชั้น 2
+NET "sw_floor3"     LOC = "P47"  | IOSTANDARD = LVCMOS33; # ปุ่มกดเรียก/สวิตช์ชั้น 3
 
-# Motor Control
+# 5. แสดงผลเลขชั้น (7-Segment Display)
+# ------------------------------------------------------------------------------
+# seg_out: ก-ฮ ของ 7-Segment (a, b, c, d, e, f, g)
+NET "seg_out<0>"    LOC = "P41"  | IOSTANDARD = LVCMOS33; # Segment A
+NET "seg_out<1>"    LOC = "P40"  | IOSTANDARD = LVCMOS33; # Segment B
+NET "seg_out<2>"    LOC = "P35"  | IOSTANDARD = LVCMOS33; # Segment C
+NET "seg_out<3>"    LOC = "P34"  | IOSTANDARD = LVCMOS33; # Segment D
+NET "seg_out<4>"    LOC = "P32"  | IOSTANDARD = LVCMOS33; # Segment E
+NET "seg_out<5>"    LOC = "P29"  | IOSTANDARD = LVCMOS33; # Segment F
+NET "seg_out<6>"    LOC = "P27"  | IOSTANDARD = LVCMOS33; # Segment G
 
-NET "ena_pwm"       LOC = "P112" | IOSTANDARD = LVCMOS33;
+# seg_common: ขาเลือกหลัก (Digit Selection)
+NET "seg_common<0>" LOC = "P44"  | IOSTANDARD = LVCMOS33; # Common Digit 1
+NET "seg_common<1>" LOC = "P43"  | IOSTANDARD = LVCMOS33; # Common Digit 2
+NET "seg_common<2>" LOC = "P33"  | IOSTANDARD = LVCMOS33; # Common Digit 3
+NET "seg_common<3>" LOC = "P30"  | IOSTANDARD = LVCMOS33; # Common Digit 4
 
-NET "in1_dir"       LOC = "P111" | IOSTANDARD = LVCMOS33;
+# 6. ไฟแสดงสถานะประตูและเสียงเตือน
+# ------------------------------------------------------------------------------
+# door_led: ไฟวิ่งเวลาประตูเปิด/ปิด (5 ดวง)
+NET "door_led<0>"   LOC = "P78"  | IOSTANDARD = LVCMOS33; # LED 1
+NET "door_led<1>"   LOC = "P79"  | IOSTANDARD = LVCMOS33; # LED 2
+NET "door_led<2>"   LOC = "P80"  | IOSTANDARD = LVCMOS33; # LED 3
+NET "door_led<3>"   LOC = "P81"  | IOSTANDARD = LVCMOS33; # LED 4
+NET "door_led<4>"   LOC = "P82"  | IOSTANDARD = LVCMOS33; # LED 5
+NET "door_beep"     LOC = "P83"  | IOSTANDARD = LVCMOS33; # ต่อเข้า Buzzer (เสียงเตือนตอนประตูจะปิด)
 
-NET "in2_dir"       LOC = "P105" | IOSTANDARD = LVCMOS33;
-
-
-
-# Sensors and Communication
-
-NET "pulse_in"      LOC = "P137" | IOSTANDARD = LVCMOS33;
-
-NET "rx_in"         LOC = "P133" | IOSTANDARD = LVCMOS33;
-
-NET "tx_out"        LOC = "P131" | IOSTANDARD = LVCMOS33;
-
-NET "door_hold"     LOC = "P66"  | IOSTANDARD = LVCMOS33;
-
-
-
-# Floor Switches
-
-NET "sw_floor1"     LOC = "P45"  | IOSTANDARD = LVCMOS33;
-
-NET "sw_floor2"     LOC = "P46"  | IOSTANDARD = LVCMOS33;
-
-NET "sw_floor3"     LOC = "P47"  | IOSTANDARD = LVCMOS33;
-
-
-
-# 7-Segment Display (Cathode/Anode)
-
-NET "seg_out<0>"    LOC = "P41"  | IOSTANDARD = LVCMOS33;
-
-NET "seg_out<1>"    LOC = "P40"  | IOSTANDARD = LVCMOS33;
-
-NET "seg_out<2>"    LOC = "P35"  | IOSTANDARD = LVCMOS33;
-
-NET "seg_out<3>"    LOC = "P34"  | IOSTANDARD = LVCMOS33;
-
-NET "seg_out<4>"    LOC = "P32"  | IOSTANDARD = LVCMOS33;
-
-NET "seg_out<5>"    LOC = "P29"  | IOSTANDARD = LVCMOS33;
-
-NET "seg_out<6>"    LOC = "P27"  | IOSTANDARD = LVCMOS33;
-
-
-
-NET "seg_common<0>" LOC = "P44"  | IOSTANDARD = LVCMOS33;
-
-NET "seg_common<1>" LOC = "P43"  | IOSTANDARD = LVCMOS33;
-
-NET "seg_common<2>" LOC = "P33"  | IOSTANDARD = LVCMOS33;
-
-NET "seg_common<3>" LOC = "P30"  | IOSTANDARD = LVCMOS33;
-
-
-
-# Door Status LEDs
-
-NET "door_led<0>"   LOC = "P78"  | IOSTANDARD = LVCMOS33;
-
-NET "door_led<1>"   LOC = "P79"  | IOSTANDARD = LVCMOS33;
-
-NET "door_led<2>"   LOC = "P80"  | IOSTANDARD = LVCMOS33;
-
-NET "door_led<3>"   LOC = "P81"  | IOSTANDARD = LVCMOS33;
-
-NET "door_led<4>"   LOC = "P82"  | IOSTANDARD = LVCMOS33;
-
-
-
-# Buzzer
-
-NET "door_beep"     LOC = "P83"  |; IOSTANDARD = LVCMOS33;
-
-
-
-# Timing Constraints
-
+# 7. การตั้งค่าความเร็วระบบ (Timing Constraint)
+# ------------------------------------------------------------------------------
 NET "clk" TNM_NET = clk;
-
-TIMESPEC TS_clk = PERIOD "clk" 50 ns HIGH 50%;
+TIMESPEC TS_clk = PERIOD "clk" 50 ns HIGH 50%; # ตั้งค่าให้ FPGA รู้ว่าใช้ Clock 20MHz (50ns)
