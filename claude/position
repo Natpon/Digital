@@ -1,0 +1,44 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
+
+entity Floor_Position_Tracker is
+    Port (
+        clk         : in  STD_LOGIC;
+        rst         : in  STD_LOGIC;
+        pulse_in    : in  STD_LOGIC;
+        dir_up      : in  STD_LOGIC;
+        current_pos : out STD_LOGIC_VECTOR(15 downto 0)
+    );
+end Floor_Position_Tracker;
+
+architecture Behavioral of Floor_Position_Tracker is
+    signal pulse_meta  : STD_LOGIC := '0';
+    signal pulse_sync  : STD_LOGIC_VECTOR(1 downto 0) := "00";
+    signal pos_counter : integer range 0 to 65535 := 0;
+begin
+    process(clk, rst)
+    begin
+        if rst = '1' then
+            pulse_meta  <= '0';
+            pulse_sync  <= "00";
+            pos_counter <= 0;
+        elsif rising_edge(clk) then
+            pulse_meta    <= pulse_in;
+            pulse_sync(0) <= pulse_meta;
+            pulse_sync(1) <= pulse_sync(0);
+            if pulse_sync(1) = '0' and pulse_sync(0) = '1' then
+                if dir_up = '1' then
+                    if pos_counter < 65535 then
+                        pos_counter <= pos_counter + 1;
+                    end if;
+                else
+                    if pos_counter > 0 then
+                        pos_counter <= pos_counter - 1;
+                    end if;
+                end if;
+            end if;
+        end if;
+    end process;
+    current_pos <= std_logic_vector(to_unsigned(pos_counter, 16));
+end Behavioral;

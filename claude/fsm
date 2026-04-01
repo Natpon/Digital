@@ -1,0 +1,128 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
+
+entity Elevator_FSM is
+    Port (
+        clk          : in  STD_LOGIC;
+        rst          : in  STD_LOGIC;
+        target_floor : in  STD_LOGIC_VECTOR(15 downto 0);
+        current_pos  : in  STD_LOGIC_VECTOR(15 downto 0);
+        door_hold    : in  STD_LOGIC;
+        motor_run    : out STD_LOGIC;
+        motor_dir    : out STD_LOGIC;
+        seg_common   : out STD_LOGIC_VECTOR(3 downto 0);
+        door_led     : out STD_LOGIC_VECTOR(4 downto 0);
+        door_beep    : out STD_LOGIC
+    );
+end Elevator_FSM;
+
+architecture Behavioral of Elevator_FSM is
+    type fsm_state is (IDLE, MOVING_UP, MOVING_DOWN, DOOR_OPEN, DOOR_BEEP);
+    signal state : fsm_state := IDLE;
+
+    constant TOLERANCE     : integer := 50;
+    constant TIME_1_SEC    : unsigned(27 downto 0) := to_unsigned(20000000, 28);
+    constant TIME_HALF_SEC : unsigned(27 downto 0) := to_unsigned(10000000, 28);
+
+    signal delay_timer    : unsigned(27 downto 0) := (others => '0');
+    signal sec_counter    : integer range 0 to 5 := 0;
+    signal latched_target : integer := 0;
+    signal current_val    : integer := 0;
+    signal prev_target    : integer := 0;
+
+begin
+    current_val <= to_integer(unsigned(current_pos));
+
+    process(clk, rst)
+    begin
+        if rst = '1' then
+            state          <= IDLE;
+            motor_run      <= '0';
+            motor_dir      <= '0';
+            door_led       <= (others => '0');
+            door_beep      <= '0';
+            seg_common     <= "1111";
+            delay_timer    <= (others => '0');
+            sec_counter    <= 0;
+            latched_target <= 0;
+            prev_target    <= 0;
+        elsif rising_edge(clk) then
+            motor_run  <= '0';
+            door_led   <= (others => '0');
+            door_beep  <= '0';
+            seg_common <= "0000";
+
+            case state is
+                when IDLE =>
+                    latched_target <= to_integer(unsigned(target_floor));
+                    if to_integer(unsigned(target_floor)) > current_val + TOLERANCE then
+                        state <= MOVING_UP;
+                    elsif to_integer(unsigned(target_floor)) + TOLERANCE < current_val then
+                        state <= MOVING_DOWN;
+                    elsif to_integer(unsigned(target_floor)) /= prev_target then
+                        state       <= DOOR_OPEN;
+                        sec_counter <= 0;
+                    end if;
+                    prev_target <= to_integer(unsigned(target_floor));
+
+                when MOVING_UP =>
+                    motor_run <= '1';
+                    motor_dir <= '1';
+                    if (to_integer(unsigned(target_floor)) < latched_target) and
+                       (to_integer(unsigned(target_floor)) > current_val + TOLERANCE) then
+                        latched_target <= to_integer(unsigned(target_floor));
+                    end if;
+                    if current_val >= latched_target - TOLERANCE then
+                        state       <= DOOR_OPEN;
+                        sec_counter <= 0;
+                    end if;
+
+                when MOVING_DOWN =>
+                    motor_run <= '1';
+                    motor_dir <= '0';
+                    if (to_integer(unsigned(target_floor)) > latched_target) and
+                       (to_integer(unsigned(target_floor)) < current_val - TOLERANCE) then
+                        latched_target <= to_integer(unsigned(target_floor));
+                    end if;
+                    if current_val <= latched_target + TOLERANCE then
+                        state       <= DOOR_OPEN;
+                        sec_counter <= 0;
+                    end if;
+
+                when DOOR_OPEN =>
+                    case sec_counter is
+                        when 0      => door_led <= "11111";
+                        when 1      => door_led <= "01111";
+                        when 2      => door_led <= "00111";
+                        when 3      => door_led <= "00011";
+                        when 4      => door_led <= "00001";
+                        when others => door_led <= "00000";
+                    end case;
+                    if door_hold = '1' then
+                        delay_timer <= (others => '0');
+                        sec_counter <= 0;
+                    elsif delay_timer = TIME_1_SEC - 1 then
+                        delay_timer <= (others => '0');
+                        if sec_counter = 4 then
+                            state       <= DOOR_BEEP;
+                            sec_counter <= 0;
+                        else
+                            sec_counter <= sec_counter + 1;
+                        end if;
+                    else
+                        delay_timer <= delay_timer + 1;
+                    end if;
+
+                when DOOR_BEEP =>
+                    door_beep <= '1';
+                    if delay_timer = TIME_HALF_SEC - 1 then
+                        delay_timer <= (others => '0');
+                        state       <= IDLE;
+                    else
+                        delay_timer <= delay_timer + 1;
+                    end if;
+            end case;
+        end if;
+    end process;
+end Behavioral;
