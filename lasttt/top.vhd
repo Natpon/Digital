@@ -52,7 +52,7 @@ architecture Structural of Elevator_Top is
 
     signal sig_pwm_out    : STD_LOGIC;
 
-    signal sig_duty_cycle : integer range 0 to 1000 := 100; -- ตั้งค่าความเร็วเริ่มต้นที่ 50% (500/1000)
+    signal sig_duty_cycle : integer range 0 to 1000 := ภ00; -- ตั้งค่าความเร็วเริ่มต้นที่ 50% (500/1000)
 
 
 
@@ -278,92 +278,55 @@ begin
 
     -- Queue Manager
 
+    -- Queue Manager
     process(clk, rst)
-
         variable pos : integer;
-
     begin
-
         if rst = '1' then
-
             sig_target_pos <= (others => '0');
-
             last_dir       <= '1';
-
         elsif rising_edge(clk) then
-
             pos := to_integer(unsigned(sig_current_pos));
-
             if sig_motor_run = '1' then last_dir <= sig_motor_dir; end if;
-
+            
             if sig_motor_run = '1' and sig_motor_dir = '1' then
-
-                if req_f2 = '1' and pos < 4500 then
-
+                -- ขาขึ้น: ถ้ามีคิวชั้น 2 และตำแหน่งยังไม่ถึงชั้น 2 (ให้เผื่อระยะตัดสินใจที่ < 600)
+                if req_f2 = '1' and pos < 600 then
                     sig_target_pos <= POS_F2;
-
                 elsif req_f3 = '1' then
-
                     sig_target_pos <= POS_F3;
-
                 end if;
-
+                
             elsif sig_motor_run = '1' and sig_motor_dir = '0' then
-
-                if req_f2 = '1' and pos > 5500 then
-
+                -- ขาลง: ถ้ามีคิวชั้น 2 และตำแหน่งยังไม่ลงมาเลยชั้น 2 (ให้เผื่อระยะตัดสินใจที่ > 640)
+                if req_f2 = '1' and pos > 640 then
                     sig_target_pos <= POS_F2;
-
                 elsif req_f1 = '1' then
-
                     sig_target_pos <= POS_F1;
-
                 end if;
-
+                
             elsif sig_motor_run = '0' then
-
                 if sig_current_floor = "01" then
-
                     if    req_f2 = '1' then sig_target_pos <= POS_F2;
-
                     elsif req_f3 = '1' then sig_target_pos <= POS_F3;
-
                     end if;
-
                 elsif sig_current_floor = "11" then
-
                     if    req_f2 = '1' then sig_target_pos <= POS_F2;
-
                     elsif req_f1 = '1' then sig_target_pos <= POS_F1;
-
                     end if;
-
                 elsif sig_current_floor = "10" then
-
                     if last_dir = '1' then
-
                         if    req_f3 = '1' then sig_target_pos <= POS_F3;
-
                         elsif req_f1 = '1' then sig_target_pos <= POS_F1;
-
                         end if;
-
                     else
-
                         if    req_f1 = '1' then sig_target_pos <= POS_F1;
-
                         elsif req_f3 = '1' then sig_target_pos <= POS_F3;
-
                         end if;
-
                     end if;
-
                 end if;
-
             end if;
-
         end if;
-
     end process;
 
 
@@ -407,29 +370,24 @@ begin
 
 
     -- Position to Floor Converter
-
+-- Position to Floor Converter
     process(clk, rst)
-
     begin
-
         if rst = '1' then
-
             sig_current_floor <= "01";
-
         elsif rising_edge(clk) then
-
-            if    to_integer(unsigned(sig_current_pos)) < 2500 then sig_current_floor <= "01";
-
-            elsif to_integer(unsigned(sig_current_pos)) < 7500 then sig_current_floor <= "10";
-
-            else                                                    sig_current_floor <= "11";
-
+            -- ถ้าตำแหน่ง < 310 ถือว่าอยู่โซนชั้น 1
+            if    to_integer(unsigned(sig_current_pos)) < 310 then 
+                sig_current_floor <= "01";
+            -- ถ้าตำแหน่ง 310 ถึง 1009 ถือว่าอยู่โซนชั้น 2
+            elsif to_integer(unsigned(sig_current_pos)) < 1010 then 
+                sig_current_floor <= "10";
+            -- ถ้าตำแหน่งตั้งแต่ 1010 ขึ้นไป ถือว่าอยู่โซนชั้น 3
+            else                                                    
+                sig_current_floor <= "11";
             end if;
-
         end if;
-
     end process;
-
 
 
     -- 7-Segment Display
